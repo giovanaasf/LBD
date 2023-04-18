@@ -1,0 +1,182 @@
+CREATE TABLE TAB_Cliente
+(   CodCliente number(5) NOT NULL,
+    NomeCliente varchar2(30) NOT NULL,
+    Endereco varchar2(30),
+    Cidade varchar2(20),
+    CEP varchar2(10),
+    UF char(2)
+);
+
+CREATE TABLE TAB_Vendedor
+(   CodVendedor number(5) NOT NULL,
+    NomeVendedor varchar2(30) NOT NULL,
+    FaixaComissao number(4,2),
+    Salario number(7,2)
+);
+
+CREATE TABLE TAB_Produto
+(   CodProduto number(5) NOT NULL,
+    Descricao varchar(30),
+    Unidade char(2),
+    ValorUnitario number(6,2)
+);
+
+CREATE TABLE TAB_Pedido
+(   NumPedido number(5) NOT NULL,
+    PrazoEntrega date,
+    CodCliente number(5),
+    CodVendedor number(5)
+);
+
+CREATE TABLE TAB_ItemPedido
+(   NumPedido number(5) NOT NULL,
+    CodProduto number(5) NOT NULL,
+    Quantidade number(5)
+);
+
+CREATE TABLE TabLog
+( 	datalog DATE,
+	campo1 VARCHAR2(60),
+	campo2 VARCHAR2(60)
+);
+
+CREATE TABLE TabErro
+(	dataerro DATE,
+	mensagem VARCHAR2(50)
+);
+
+ALTER TABLE TAB_Cliente ADD PRIMARY KEY(CodCliente);
+ALTER TABLE TAB_Produto ADD PRIMARY KEY(CodProduto);
+ALTER TABLE TAB_VENDEDOR ADD PRIMARY KEY(CodVendedor);
+ALTER TABLE TAB_PEDIDO ADD PRIMARY KEY(NumPedido);
+ALTER TABLE TAB_ItemPedido ADD PRIMARY KEY(NumPedido,CodProduto);
+
+ALTER TABLE TAB_Pedido ADD FOREIGN KEY (CodCliente) REFERENCES TAB_Cliente;
+ALTER TABLE TAB_Pedido ADD FOREIGN KEY (CodVendedor) REFERENCES TAB_Vendedor;
+ALTER TABLE TAB_ItemPedido ADD FOREIGN KEY (NumPedido) REFERENCES TAB_Pedido;
+ALTER TABLE TAB_ItemPedido ADD FOREIGN KEY (CodProduto) REFERENCES TAB_Produto;
+
+INSERT INTO TAB_Vendedor VALUES (5,'Antonio Pedro',5.0,400);
+INSERT INTO TAB_Vendedor VALUES (15,'Carlos Sola',0.0,400);
+INSERT INTO TAB_Vendedor VALUES (25,'Ana Carolina',1.0,200);
+INSERT INTO TAB_Vendedor VALUES (35,'Solange Almeida',1.0,300);
+
+INSERT INTO TAB_Cliente VALUES (30, 'João da Silva', 'AV. MATT HOFFMANN, 1100', 'SÃO PAULO', '97056-001', 'SP');
+INSERT INTO TAB_Cliente VALUES (31, 'LUCAS ANTUNES', 'RUA TRODANI, 120', 'SOROCABA', '19658-023', 'SP');
+INSERT INTO TAB_Cliente VALUES (32, 'LAURA STRAUSS', 'RUA TULIPAS, 650', 'PRIMAVERA', '18556-025', 'SP');
+
+INSERT INTO TAB_Produto VALUES (11, 'Apple Watch', 'UN', 975.99);
+INSERT INTO TAB_Produto VALUES (12, 'IPAD', 'UN', 999.70);
+INSERT INTO TAB_Produto VALUES (13, 'PÓ PARA TONER', 'KG', 85.60);
+INSERT INTO TAB_Produto VALUES (14, 'Mouse', 'UN', 45.60);
+INSERT INTO TAB_Produto VALUES (15, 'Caneta digital', 'UN', 100.00);
+INSERT INTO TAB_Produto VALUES (40,'Mouse sem fio', 'UN', 68.90);
+INSERT INTO TAB_Produto VALUES (42,'FIO HDMI', 'UN', 18.00);
+INSERT INTO TAB_Produto VALUES (43,'Pendrive Star Wars', 'UN', 48.00);
+INSERT INTO TAB_Produto VALUES (44,'Mouse com fio', 'UN', 28.00);
+INSERT INTO TAB_Produto VALUES (45,'Pendrive do Mickey', 'UN', 50.00);
+
+INSERT INTO TAB_PEDIDO VALUES (8, to_date('23-05-2020', 'DD-MM-YYYY'), 32, 25);
+INSERT INTO TAB_PEDIDO VALUES (9, to_date('21/02/2020', 'DD-MM-YYYY'), 32, 5);
+INSERT INTO TAB_PEDIDO VALUES (10, to_date('20/02/2020', 'DD-MM-YYYY'), 30, 5);
+
+INSERT INTO TAB_ItemPedido VALUES (7,11,1);
+INSERT INTO TAB_ItemPedido VALUES (7,40,2);
+INSERT INTO TAB_ItemPedido VALUES (7,42,1);
+INSERT INTO TAB_ItemPedido VALUES (8,43,5);
+INSERT INTO TAB_ItemPedido VALUES (9,12,1);
+INSERT INTO TAB_ItemPedido VALUES (10,11,1);
+INSERT INTO TAB_ItemPedido VALUES (10,43,1);
+INSERT INTO TAB_ItemPedido VALUES (10,13,2);
+INSERT INTO TAB_ItemPedido VALUES (8,40,1);
+
+-- Crie uma stored procedure que calcule o percentual de comissão para um vendedor
+--cujo código é passado como parâmetro e realize:
+create or replace procedure SP_Comissao (Pcodvend number)
+as 
+v_valped number;
+vcodvend tab_vendedor.codvendedor%type;
+vpercom tab_vendedor.faixacomissao%type;
+
+begin
+    -- verificando se vendedor existe 
+    select codVendedor into vcodvend from tab_vendedor
+    where codvendedor = pcodvend;
+    
+    --somatoria do valor de todos os pedidos
+    select sum(p.valorunitario * ip.quantidade) into v_valped from tab_itempedido ip 
+    inner join tab_produto p on ip.codproduto = p.codproduto
+    inner join tab_pedido ped on ped.numpedido = ip.numpedido
+    where p.codvendedor = ped.codvendedor; 
+    
+    if v_valped = 0 then
+        vpercom := 0;
+    elsif v_valped > 0 and v_valped < 100 then
+    	vpercom := 0.1;
+    elsif v_valped >= 100 and v_valped <= 1000 then
+    	vpercom := 0.15;
+    else 
+    	vpercom := 0.2;
+    end if;
+    
+    update tab_vendedor set faixacomissao = vpercom 
+    where codvendedor = pcodvend;
+	
+	commit;
+
+Exception 
+	when no_data_found then
+        insert into taberro values ('Vendedor ' || pcodvend || ' não existe');
+end;
+
+select * from taberro;
+
+exec SP_Comissao(35);
+
+
+--2.
+create or replace procedure SP_Produto (Pcodpod number, Piduser number)
+as 
+vqtdeprod number;
+vdescricao tab_produto.descricao%type;
+
+BEGIN
+	-- testando se existem pedidos para ele
+    select count(*) into vqtdeprod from tab_itempedido
+	where codproduto = pcodpod;
+
+
+	if vqtdeprod = 0 then 
+        --inserindo dados de descricao 
+		select descricao into vdescricao from tab_produto
+   		where codproduto = pcodpod;
+        --inserindo dados em tablog
+        insert into tablog values (sysdate, pcodpod || ' - ' || vdescricao, piduser);
+		--excluindo dados
+		delete from tab_produto where codproduto = pcodpod;
+	end if;
+
+	commit;
+
+Exception 
+	when no_data_found then
+        insert into taberro values (sysdate, 'O produto de código ' || pcodpod || ' é inexistente');
+
+end;
+
+--produto existe e não tem pedidos -> tablog
+EXEC SP_Produto(15, 520);
+
+--produto não existe -> tab erro
+EXEC SP_Produto(46, 200);
+
+--produto existe e há pedidos
+EXEC SP_PRODUTO(40, 260);
+
+select * from tablog;
+select * from taberro;
+
+delete taberro;
+delete tablog;
+
+select * from tab_produto;
