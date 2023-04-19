@@ -97,6 +97,7 @@ as
 v_valped number;
 vcodvend tab_vendedor.codvendedor%type;
 vpercom tab_vendedor.faixacomissao%type;
+vped number;
 
 begin
     -- verificando se vendedor existe 
@@ -104,19 +105,25 @@ begin
     where codvendedor = pcodvend;
     
     --somatoria do valor de todos os pedidos
-    select sum(p.valorunitario * ip.quantidade) into v_valped from tab_itempedido ip 
-    inner join tab_produto p on ip.codproduto = p.codproduto
-    inner join tab_pedido ped on ped.numpedido = ip.numpedido
-    where p.codvendedor = ped.codvendedor; 
+    select sum(valorunitario * quantidade) into v_valped from 
+    tab_produto inner join TAB_ITEMPEDIDO on tab_produto.CODPRODUTO = tab_ITEMPEDIDO.CODPRODUTO
+    inner join tab_pedido on tab_pedido.NUMPEDIDO = tab_ITEMPEDIDO.NUMPEDIDO 
+    where tab_pedido.CODVENDEDOR = Pcodvend;
     
-    if v_valped = 0 then
-        vpercom := 0;
-    elsif v_valped > 0 and v_valped < 100 then
+    if v_valped > 0 and v_valped < 100 then
     	vpercom := 0.1;
     elsif v_valped >= 100 and v_valped <= 1000 then
     	vpercom := 0.15;
     else 
     	vpercom := 0.2;
+    end if;
+  
+    select count(*) into vped from 
+    tab_pedido where tab_pedido.codvendedor = pcodvend;
+    
+    
+    if vped = 0 then
+      vpercom := 0;
     end if;
     
     update tab_vendedor set faixacomissao = vpercom 
@@ -126,13 +133,20 @@ begin
 
 Exception 
 	when no_data_found then
-        insert into taberro values ('Vendedor ' || pcodvend || ' não existe');
+        insert into taberro values (sysdate, 'Vendedor ' || pcodvend || ' não existe');
 end;
 
 select * from taberro;
 
 exec SP_Comissao(35);
 
+exec SP_Comissao(25);
+
+select count(*) from TAB_PEDIDO inner join tab_vendedor on TAB_PEDIDO.CODVENDEDOR = tab_vendedor.CODVENDEDOR;
+ select count(*) into vped from 
+tab_pedido where tab_pedido.codvendedor = pcodvend;
+
+select * from tb_vendedor;
 
 --2.
 create or replace procedure SP_Produto (Pcodpod number, Piduser number)
