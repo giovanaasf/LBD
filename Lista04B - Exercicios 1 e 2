@@ -90,93 +90,126 @@ INSERT INTO TAB_ItemPedido VALUES (10,43,1);
 INSERT INTO TAB_ItemPedido VALUES (10,13,2);
 INSERT INTO TAB_ItemPedido VALUES (8,40,1);
 
+
+
 -- Crie uma stored procedure que calcule o percentual de comissão para um vendedor
 --cujo código é passado como parâmetro e realize:
+
 create or replace procedure SP_Comissao (Pcodvend number)
-as 
+
+as
+
 v_valped number;
+
 vcodvend tab_vendedor.codvendedor%type;
+
 vpercom tab_vendedor.faixacomissao%type;
-vped number;
 
 begin
-    -- verificando se vendedor existe 
-    select codVendedor into vcodvend from tab_vendedor
-    where codvendedor = pcodvend;
-    
-    --somatoria do valor de todos os pedidos
-    select sum(valorunitario * quantidade) into v_valped from 
-    tab_produto inner join TAB_ITEMPEDIDO on tab_produto.CODPRODUTO = tab_ITEMPEDIDO.CODPRODUTO
-    inner join tab_pedido on tab_pedido.NUMPEDIDO = tab_ITEMPEDIDO.NUMPEDIDO 
-    where tab_pedido.CODVENDEDOR = Pcodvend;
-    
-    if v_valped > 0 and v_valped < 100 then
-    	vpercom := 0.1;
-    elsif v_valped >= 100 and v_valped <= 1000 then
-    	vpercom := 0.15;
-    else 
-    	vpercom := 0.2;
-    end if;
-  
-    select count(*) into vped from 
-    tab_pedido where tab_pedido.codvendedor = pcodvend;
-    
-    
-    if vped = 0 then
-      vpercom := 0;
-    end if;
-    
-    update tab_vendedor set faixacomissao = vpercom 
-    where codvendedor = pcodvend;
-	
-	commit;
 
-Exception 
-	when no_data_found then
-        insert into taberro values (sysdate, 'Vendedor ' || pcodvend || ' não existe');
+-- verificando se vendedor existe
+
+select codVendedor into vcodvend from tab_vendedor
+
+where codvendedor = pcodvend;
+
+--somatoria do valor de todos os pedidos
+
+select sum(pr.valorunitario * ip.quantidade) into v_valped from
+
+Tab_pedido p inner join tab_itempedido ip
+
+On p.numpedido = ip.numpedido
+
+Inner join tab_produto pr
+
+On ip.codproduto = pr.codproduto
+
+Where p.codvendedor = pcodvend;
+
+
+If v_valped is null then
+	Vpercom := 0;
+else
+    if v_valped > 0 and v_valped < 100 then
+    	vpercom := 10.00;
+	else 
+        if v_valped >= 100 and v_valped <= 1000 then
+			vpercom := 15.00;
+		else
+			vpercom := 20.00;
+		end if;
+    end if;
+end if;
+
+update tab_vendedor set faixacomissao = vpercom
+
+where codvendedor = pcodvend;
+
+commit;
+
+Exception
+
+when no_data_found then
+
+insert into taberro values (sysdate, 'Vendedor ' || pcodvend || ' não existe');
+
 end;
 
-select * from taberro;
+exec SP_Comissao(60); -- vend n existe
+exec SP_Comissao(35); -- vend sem pedidos -> 0
+exec SP_Comissao(5); -- vend com pedidos existe -> 20
 
-exec SP_Comissao(35);
 
-exec SP_Comissao(25);
-
-select count(*) from TAB_PEDIDO inner join tab_vendedor on TAB_PEDIDO.CODVENDEDOR = tab_vendedor.CODVENDEDOR;
- select count(*) into vped from 
-tab_pedido where tab_pedido.codvendedor = pcodvend;
-
-select * from tb_vendedor;
 
 --2.
-create or replace procedure SP_Produto (Pcodpod number, Piduser number)
-as 
+create or replace procedure SP_Produto (Pcodpod number)
+
+as
+
 vqtdeprod number;
+
 vdescricao tab_produto.descricao%type;
 
 BEGIN
-	-- testando se existem pedidos para ele
-    select count(*) into vqtdeprod from tab_itempedido
-	where codproduto = pcodpod;
 
+--inserindo dados de descricao e automaticamente testando se esse produto existe
 
-	if vqtdeprod = 0 then 
-        --inserindo dados de descricao 
-		select descricao into vdescricao from tab_produto
-   		where codproduto = pcodpod;
-        --inserindo dados em tablog
-        insert into tablog values (sysdate, pcodpod || ' - ' || vdescricao, piduser);
-		--excluindo dados
-		delete from tab_produto where codproduto = pcodpod;
-	end if;
+select descricao into vdescricao
 
-	commit;
+from tab_produto where codproduto = pcodpod;
 
-Exception 
-	when no_data_found then
-        insert into taberro values (sysdate, 'O produto de código ' || pcodpod || ' é inexistente');
+select count(*) into vqtdeprod from tab_itempedido
+
+where codproduto = pcodpod;
+
+if vqtdeprod = 0 then
+
+--inserindo dados em tablog
+
+insert into tablog values (sysdate, pcodpod || ' - ' || vdescricao, user);
+
+--excluindo dados
+
+delete from tab_produto where codproduto = pcodpod;
+
+Else
+
+insert into tablog values (sysdate, pcodpod || ' - ' || vdescricao, ‘Produto não pode ser excluido porque tem pedidos’);
+
+end if;
+
+commit;
+
+Exception
+
+when no_data_found then
+
+insert into taberro values (sysdate, 'O produto de código ' || pcodpod || ' é inexistente');
 
 end;
+
+
 
 --produto existe e não tem pedidos -> tablog
 EXEC SP_Produto(15, 520);
