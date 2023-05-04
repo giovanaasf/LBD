@@ -1,0 +1,100 @@
+--2
+create or replace Function Fn_Idoso(pcodpac paciente.codpaciente%type)
+return varchar2
+as 
+vtexto varchar2(30);
+vdatanasc date;
+begin
+  select datanasc into vdatanasc from paciente
+  where codpaciente = pcodpac;
+
+  if (((sysdate - vdatanasc)/365.25) > 65) then 
+    vtexto := 'IDOSO';
+  else
+    vtexto := 'NÃO IDOSO';
+  END IF; 
+
+  return (vtexto);
+  end Fn_Idoso;
+
+  SELECT FN_IDOSO (3) FROM dual;
+
+  SELECT * FROM PACIENTE;
+  update paciente set datanasc = '08/07/2002'
+  where CODPACIENTE = 3;
+
+--3
+Create or replace Function Fn_VerTelefone(ptel in number)
+return varchar2
+as
+vtelefone varchar2(40);
+Begin
+	vtelefone := '(' || SUBSTR(ptel,1,2) || ')' || SUBSTR(ptel,3,4) || '-' || SUBSTR(ptel,7,4);
+	Return (vtelefone);
+End Fn_VerTelefone; 
+
+select FN_VerTelefone (2799775677) from dual;
+
+alter table tab_produto add qtde_estoque number(5);
+update tab_produto set qtde_estoque = 50;
+
+--4
+Create or replace Function Fn_ConsultaEstoque (pcodprod TaB_produto.codproduto%type)
+return number
+as
+Vestoque TaB_produto.qtde_estoque%type;
+Begin
+	Select qtde_estoque into Vestoque From tab_produto
+	Where tab_produto.codproduto = pcodprod;	
+
+	Return (Vestoque);
+End Fn_ConsultaEstoque;
+
+--c. 
+select FN_ConsultaEstoque(15) from dual;
+
+
+
+--5
+create or replace Function Fn_EstadoCliente (pcodcli tab_cliente.codcliente%type)
+return varchar2
+as
+vcodcli tab_cliente.codcliente%type;
+vtexto varchar2(60);
+vqtdeped number(5);
+vnome tab_cliente.nomecliente%type;
+Begin
+	select codcliente, nomecliente into vcodcli, vnome from tab_cliente
+	where codcliente = pcodcli;
+
+	select count(*) into vqtdeped from tab_pedido
+	where codcliente = pcodcli;
+
+	if (vqtdeped > 3) then
+		vtexto := ('Cliente preferencial: ' || vcodcli || ' - ' || vnome);
+	else
+		if (vqtdeped between 1 and 3) then
+        	vtexto := ('Cliente normal: ' || vcodcli || ' - ' || vnome);
+		else 
+          vtexto := ('Cliente inativo: ' || vcodcli || ' - ' || vnome);
+		end if;
+	end if;
+
+	Return(vtexto);
+
+	exception
+  		when no_data_found then
+        Return('O cliente não existe: '||pcodcli);
+END Fn_EstadoCliente;
+
+INSERT INTO TAB_PEDIDO VALUES (12, to_date('21/02/2020', 'DD-MM-YYYY'), 32, 5);
+INSERT INTO TAB_PEDIDO VALUES (16, to_date('21/02/2020', 'DD-MM-YYYY'), 32, 5);
+	
+select * from tab_pedido;
+
+SELECT codcliente, Fn_EstadoCliente(codcliente) as estado_cliente
+FROM tab_cliente
+WHERE codcliente IN (SELECT codcliente FROM tab_cliente)
+ORDER BY codcliente;
+
+SELECT Fn_EstadoCliente(32) FROM dual;--n consigo testar exception
