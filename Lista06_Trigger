@@ -1,0 +1,96 @@
+--LISTA 06
+--1. 
+CREATE OR REPLACE TRIGGER TR_VerificaNumPedidos
+BEFORE INSERT ON tb_item_pedido
+FOR EACH ROW
+DECLARE
+  vcodcli TB_PEDIDO.CODCLIENTE%type;
+  vtotal NUMBER;
+BEGIN
+  SELECT codcliente INTO vcodcli FROM tb_pedido WHERE numpedido = :new.numpedido; 
+  SELECT COUNT(*) INTO vtotal FROM TB_PEDIDO WHERE codcliente = vcodcli;
+    
+  IF vtotal >= 2 THEN
+    :new.pco_unit := :new.pco_unit * 0.85;
+  END IF;
+END TR_VerificaNumPedidos;
+
+show errors;
+insert into TB_ITEM_PEDIDO values (11, 15, 2, 115);
+
+insert into tb_pedido values (11, '30/05/2023', 32, 15);
+
+select * from TB_ITEM_PEDIDO;
+
+
+--2.
+create or replace trigger TR_AlteraEndereco
+before update of endereco on tb_cliente--só entra no trigger se for da coluna definido no of
+for each row
+declare
+  vcodcli TB_PEDIDO.CODCLIENTE%type;
+begin
+
+  insert into tablog values(sysdate,'Observar mudança de endereço do cliente: ' || :old.codcliente, 'Antigo: ' || :old.endereco || ' Novo: ' || :new.endereco);
+
+end TR_AlteraEndereco;
+
+
+UPDATE TB_cliente SET endereco = 'GENOVIA' WHERE CODCLIENTE=32;
+SELECT * FROM TABLOG;
+      
+--3.
+CREATE OR REPLACE TRIGGER TR_EstoqueItem
+BEFORE INSERT ON tb_item_pedido
+FOR EACH ROW
+DECLARE
+  vqtdeEstoque number;
+  
+BEGIN
+  
+  select qtdeestoq into vqtdeEstoque from tb_produto where tb_produto.codproduto = :new.codproduto;
+
+  
+  if vqtdeEstoque = 0 then
+    RAISE_APPLICATION_ERROR(-20001, 'Não há estoque suficiente.');
+  else
+    if :new.qtde <= vqtdeEstoque then
+      update tb_produto
+      set qtdeestoq = qtdeestoq - :new.qtde
+      where tb_produto.CODPRODUTO = :new.codproduto;
+    else
+      :new.qtde := vqtdeEstoque;
+      update tb_produto 
+      set qtdeestoq = 0
+      where tb_produto.CODPRODUTO = :new.codproduto;
+    end if;
+  end if;
+
+end TR_EstoqueItem;
+
+insert into tb_item_pedido values (11, 11, 46, 10); --qtde < estoque -> sobrou 4 -> funcionou
+insert into tb_item_pedido values (8, 11, 6, 10); --qtde > estoque -> funcionou
+insert into tb_item_pedido values (7, 11, 5, 10); --estoque = 0 inicial
+
+select * from tb_produto;
+select * from TB_ITEM_PEDIDO;
+
+--4.
+create or replace trigger TR_IncluiAltera
+before insert or update of prazo_entrega on tb_pedido
+for each row
+declare
+ -- vprazo TB_PEDIDO.PRAZO_ENTREGA%type;  select prazo_entrega into vprazo from tb_pedido where tb_pedido.numpedido = :new.numpedido;
+begin  
+    if :new.prazo_entrega < sysdate + 5 then
+      :new.prazo_entrega := sysdate + 5;
+    end if;
+end TR_IncluiAltera;
+
+insert into tb_pedido values (150, '04/04/2023', 31, 25);
+
+update tb_pedido
+set prazo_entrega = '07/05/2023'
+where NUMPEDIDO = 8;
+
+ select * from tb_pedido;
